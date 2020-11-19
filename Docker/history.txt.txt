@@ -105,5 +105,6 @@ docker build --rm=false -f DockerFile.txt -t web .
 
 systemctl list-units --type=service
 ps -ef | grep httpd
+netstat -ntlp | grep :80
 
 Pos2spApp->Pos2spDlg->SockerThread->ServerThread->WorkThread->VanSystem
