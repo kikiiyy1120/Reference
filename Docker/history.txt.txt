@@ -104,5 +104,6 @@ docker rmi centos:7
 docker build --rm=false -f DockerFile.txt -t web .
 
 systemctl list-units --type=service
+ps -ef | grep httpd
 
 Pos2spApp->Pos2spDlg->SockerThread->ServerThread->WorkThread->VanSystem
