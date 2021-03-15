@@ -1,9 +1,9 @@
-CREATE OR REPLACE PACKAGE BODY      NATG.CRYPTO
+CREATE OR REPLACE PACKAGE BODY      test.CRYPTO
 IS
     SQLERRMSG   VARCHAR2(255);
     SQLERRCDE   NUMBER;
      
-    FUNCTION encrypt (input_string IN VARCHAR2, key_data IN VARCHAR2 := '09sotusjf@^wldhr') 
+    FUNCTION encrypt (input_string IN VARCHAR2, key_data IN VARCHAR2 := 'test1234') 
      RETURN RAW
     IS
     
@@ -27,7 +27,7 @@ IS
     RETURN v_out_raw;
     END encrypt;
     
-    FUNCTION decrypt (input_string IN VARCHAR2, key_data IN VARCHAR2 := '09sotusjf@^wldhr') 
+    FUNCTION decrypt (input_string IN VARCHAR2, key_data IN VARCHAR2 := 'test1234') 
      RETURN VARCHAR2
     IS
         key_raw RAW(16) := UTL_RAW.CAST_TO_RAW(key_data);
