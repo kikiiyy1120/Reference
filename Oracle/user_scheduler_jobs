@@ -1,0 +1,93 @@
+--스케줄러 확인
+SELECT 
+  job_name, REPEAT_INTERVAL
+  , TO_CHAR(last_start_date, 'yyyy-mm-dd hh24:mi:ss')
+  , TO_CHAR(next_run_date, 'yyyy-mm-dd hh24:mi:ss')  
+FROM user_scheduler_jobs
+--WHERE logging_level = 'RUNS'
+ORDER BY REPEAT_INTERVAL
+
+--스케줄러명 확인
+select * 
+from user_scheduler_job_log 
+where job_name='JOB_SP_CUST_INAC_SMS'
+
+--스케줄러 생성
+BEGIN
+    DBMS_SCHEDULER.CREATE_JOB
+    (
+    JOB_NAME => 'JOB_SP_CUST_INAC_SMS',
+    JOB_TYPE => 'PLSQL_BLOCK',
+	JOB_CLASS       => 'DEFAULT_JOB_CLASS',
+	START_DATE      => TO_TIMESTAMP_TZ('2021/03/24 12:00:00.000000 +09:00','yyyy/mm/dd hh24:mi:ss.ff tzr'),
+    JOB_ACTION => 
+'
+DECLARE
+        /* ---------------------------------------------
+         * [고객휴면문자] SP_CUST_INAC_SMS
+         * 실행 SP : SP_CUST_INAC_SMS
+         * 주기 : 매일 03시 00분 생성
+         *
+         */
+            OUT_CODE    VARCHAR2(256) ;  -- 처리결과코드 (0:Success, -1:Fail)
+            OUT_MSG     VARCHAR2(4096);  -- 처리메세지
+        BEGIN
+            -- 회사코드를 가져온다...
+
+            DECLARE CURSOR COMP_DATA IS
+
+                SELECT COMP_CD, COMP_KOR_NM
+                FROM CFCOMP
+                WHERE COMP_CLOSE_DT IS NULL
+                  and comp_cd = ''NG001''
+                ORDER BY BUSI_DT;
+
+            BEGIN
+                FOR CUR_COMP_DATA IN COMP_DATA LOOP
+
+                  BEGIN
+                      SP_CUST_INAC_SMS(CUR_COMP_DATA.COMP_CD, ''SYSTEM'', ''SYSTEM'', OUT_CODE, OUT_MSG);
+                  END;
+
+                END LOOP;
+            END;
+        END;
+	
+',
+    REPEAT_INTERVAL => 'Freq=Daily;ByHour=03;ByMinute=00;BySecond=00',
+    COMMENTS => '[전산] 휴면예정 고객안내 문자'
+    );
+END;
+
+
+
+--스케줄러 사용
+exec
+  SYS.DBMS_SCHEDULER.ENABLE
+    (name                  => 'JOB_SP_CUST_INAC_SMS');
+
+--로그사용
+execute
+SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'JOB_SP_CUST_INAC_SMS'
+     ,attribute => 'LOGGING_LEVEL'
+     ,value     => SYS.DBMS_SCHEDULER.LOGGING_RUNS);
+
+--완료 및 미사용 자동 삭제여부
+execute
+SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
+    ( name      => 'JOB_SP_CUST_INAC_SMS'
+     ,attribute => 'AUTO_DROP'
+     ,value     => false);
+
+--실행
+EXEC dbms_scheduler.run_job('JOB_SP_CUST_INAC_SMS')
+	 
+--삭제
+BEGIN
+	dbms_scheduler.drop_job
+	(
+		job_name =>'JOB_SP_CUST_INAC_SMS',
+		FORCE=>false
+	);
+END;
