@@ -101,7 +101,7 @@ SYS.DBMS_SCHEDULER.SET_ATTRIBUTE
  ,attribute => 'AUTO_DROP'
  ,value     => TRUE);	
 */
-
+---------------------------------------------------------------------------------------------------------------------------------------
 --스케줄러 확인
 SELECT 
   job_name, REPEAT_INTERVAL
