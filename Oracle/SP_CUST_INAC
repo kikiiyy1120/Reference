@@ -1,0 +1,231 @@
+CREATE OR REPLACE PROCEDURE      NATG.SP_CUST_INAC(
+	P_COMP_CD		IN CSCOUPON.COMP_CD%TYPE	--NG001
+	, P_USER_CD		IN CSCOUPON.UPDT_ID%TYPE	--SYSTEM
+	, O_ERR_CD		OUT VARCHAR2
+	, O_ERR_MSG		OUT VARCHAR2
+)
+IS
+	V_INAC_DT 		VARCHAR2(8);					--실행일
+	V_ERR_POINT 	VARCHAR2(300);					--오류포인트
+	V_SEQ			NUMBER(5);						--변경이력시퀀스
+BEGIN
+	DECLARE
+		CURSOR CUST IS
+		--구매이력 2년간 없는사람 추출		  
+		SELECT A.CUS_NO_INNER, B.BUY_QTY, B.BUY_AMT, B.ACCU_PNT, B.ETC_PNT, B.USED_PNT, B.DEL_PNT, B.EXP_PNT, B.USEFUL_PNT
+		FROM CSCUSTMST A
+		, (SELECT CUS_NO_INNER
+				, CASE WHEN LT_DT >= TO_CHAR(REGI_DT, 'YYYYMMDD') THEN LT_DT
+					   ELSE TO_CHAR(REGI_DT, 'YYYYMMDD')
+				  END LT_DT
+				, BUY_QTY
+				, BUY_AMT
+				, ACCU_PNT
+				, ETC_PNT
+				, USED_PNT
+				, DEL_PNT
+				, EXP_PNT
+				, USEFUL_PNT
+			FROM CSBUYGOODTAMT
+		) B
+		WHERE 1 = 1
+		  AND A.COMP_CD = P_COMP_CD
+		  AND A.CUS_STATUS = '1'
+		  AND A.CUS_NO_INNER = B.CUS_NO_INNER(+)
+		  --AND A.JOIN_DT = TO_CHAR(SYSDATE - 365 - 365, 'YYYYMMDD') --가입일자
+		  --AND (B.LT_DT = TO_CHAR(SYSDATE - 365 - 365, 'YYYYMMDD') OR B.LT_DT IS NULL)--최종구매일자
+		  AND EXISTS (
+						SELECT '0'
+						FROM SHSHOP
+						WHERE 1 = 1
+						  AND COMP_CD = P_COMP_CD
+						  AND SHOP_CD = A.JOIN_CD
+					)
+		  AND A.HP_NO IN (CRYPTO.ENCRYPT('01012341234'))
+		  ;
+	BEGIN
+		O_ERR_CD  	:= '0';
+		O_ERR_MSG 	:= '[정상종료]';
+		V_INAC_DT   := to_char(sysdate, 'YYYYMMDD');
+
+		FOR CUR_CUST IN CUST LOOP
+		
+			V_ERR_POINT := 'CHECK_POINT_01';
+			--회원상태 '2'(휴면)으로 바꿈
+			UPDATE CSCUSTMST
+			SET CUS_STATUS = '2'
+			WHERE CUS_NO_INNER = CUR_CUST.CUS_NO_INNER;
+			
+			V_ERR_POINT := 'CHECK_POINT_02';
+			--휴면 테이블로 복사
+			INSERT INTO CSCUSTMST_INAC
+			SELECT * 
+			FROM CSCUSTMST
+			WHERE CUS_NO_INNER = CUR_CUST.CUS_NO_INNER;
+			
+			V_ERR_POINT := 'CHECK_POINT_03';
+			--액티브 테이블 개인정보 삭제
+			UPDATE CSCUSTMST
+			SET 
+			--COMP_CD, CUS_NO_INNER, CUS_NM, JOIN_CD, ENT_CD, CUS_STATUS, CUS_DIV, CUS_GB, CUS_GRADE, MANA_EMP_ID
+			--, JOIN_DT, QUIT_DT, RMK, QUIT_REASON, VIP_YN, FT_DT, LT_DT, FT_USER, LT_USER, PROG_ID, REGI_ID, REGI_DT
+			SEX = '', CUS_AUTH_YN = '', BIRTH_DT = '', SOLAR_GB = '', BIRTH_MMDD = '', MAR_ANNI_DT = '', MAR_YN = '', MAR_MMDD = ''
+			, SMS_SEND_YN = '', MAIL_SEND_YN = '', TEL_NO = '', HP_NO = '', ADDR_TP = '', ZIP_CD = '', ADDR1 = '', ADDR2 = '', EMAIL = '', RMK = ''
+			, JOB_CD = '', HOBBY_CD = '', SYRUP_CARD_NO = '', SYRUP_YN = '', SYRUP_JOIN_DT = '', DI = '', HP_NO_LAST = '', UPDT_ID = P_USER_CD, UPDT_DT = SYSDATE
+			WHERE CUS_NO_INNER = CUR_CUST.CUS_NO_INNER;
+			
+			V_ERR_POINT := 'CHECK_POINT_04';
+			SELECT NVL(MAX(CHG_SEQ), 0)+1 
+			INTO V_SEQ
+			FROM CSCUSTMSTHIST 
+			WHERE CUS_NO_INNER = CUR_CUST.CUS_NO_INNER;
+			--고객 정보 변경 이력 저장
+			INSERT INTO CSCUSTMSTHIST 
+			(COMP_CD, CUS_NO_INNER, CHG_DT, CHG_SEQ, CHG_TP, BF_VALUE, AF_VALUE, IN_USER, IN_TIME)
+			VALUES
+			(P_COMP_CD, CUR_CUST.CUS_NO_INNER, V_INAC_DT, V_SEQ, '16', '1', '2', P_USER_CD, SYSDATE);
+			
+			V_ERR_POINT := 'CHECK_POINT_05';
+			--포인트 소멸처리
+			INSERT INTO CSPOINTDEL(
+				  COMP_CD
+				, DEL_TP
+				, BASED_YYMM
+				, CUST_NO_INNER
+				, SEQ
+				, BUY_QTY
+				, BUY_AMT
+				, ACCU_PNT
+				, ETC_PNT
+				, USED_PNT
+				, DEL_PNT
+				, EXP_PNT
+				, USEFUL_PNT
+				, PROG_ID
+				, REGI_ID
+				, REGI_DT
+				, UPDT_ID
+				, UPDT_DT
+			)
+			VALUES(
+			 P_COMP_CD
+			, '2'
+			, TO_CHAR(SYSDATE, 'YYYYMM')
+			, CUR_CUST.CUS_NO_INNER
+			, (SELECT NVL(MAX(A.SEQ)+1, 1) 
+				FROM CSPOINTDEL A
+				WHERE A.COMP_CD       = P_COMP_CD
+				  AND A.BASED_YYMM    = TO_CHAR(SYSDATE, 'YYYYMM')
+				  AND A.CUST_NO_INNER = CUR_CUST.CUS_NO_INNER)
+			, CUR_CUST.BUY_QTY
+			, CUR_CUST.BUY_AMT
+			, CUR_CUST.ACCU_PNT
+			, CUR_CUST.ETC_PNT
+			, CUR_CUST.USED_PNT
+			, CUR_CUST.DEL_PNT
+			, CUR_CUST.EXP_PNT
+			, CUR_CUST.USEFUL_PNT
+			, P_USER_CD
+			, P_USER_CD
+			, SYSDATE
+			, P_USER_CD
+			, SYSDATE
+			);
+			
+			V_ERR_POINT := 'CHECK_POINT_06';
+			UPDATE CSBUYGOODTAMT
+			SET
+				DEL_PNT = DEL_PNT + CUR_CUST.USEFUL_PNT
+			  , USEFUL_PNT = 0
+			  , UPDT_ID = P_USER_CD
+			  , UPDT_DT = SYSDATE
+			WHERE COMP_CD = P_COMP_CD
+			  AND CUS_NO_INNER = CUR_CUST.CUS_NO_INNER;
+			
+			V_ERR_POINT := 'CHECK_POINT_07';
+			INSERT INTO CSPOINTEVENT(
+				  COMP_CD
+				, EV_TP
+				, EV_DT
+				, CUS_NO_INNER
+				, EV_SEQ
+				, ACCU_POINT
+				, RMRK
+				, AUTO_YN
+				, AUTO_RMRK
+				, PROG_ID
+				, REGI_ID
+				, REGI_DT
+				, UPDT_ID
+				, UPDT_DT
+			)
+			VALUES 
+			(
+				  P_COMP_CD
+				, 'O'
+				, TO_CHAR(SYSDATE, 'YYYYMMDD')
+				, CUR_CUST.CUS_NO_INNER
+				, NVL((
+                 		SELECT 
+                 			max(EV_SEQ)+1 
+                 		FROM 
+                 			CSPOINTEVENT 
+                 		WHERE COMP_CD = P_COMP_CD
+                 		  AND CUS_NO_INNER = CUR_CUST.CUS_NO_INNER
+                 		  AND EV_DT = TO_CHAR(SYSDATE,'YYYYMMDD')),1)
+				, CUR_CUST.USEFUL_PNT*(-1)
+				, '탈퇴자동소멸'
+				, 'Y'
+				, '탈퇴회원 마일리지 자동소멸'
+				, P_USER_CD
+				, P_USER_CD
+				, SYSDATE
+				, P_USER_CD
+				, SYSDATE
+			);
+			
+			V_ERR_POINT := 'CHECK_POINT_08';
+			INSERT INTO CSCUSTMSTHIST(
+				  COMP_CD
+				, CUS_NO_INNER
+				, CHG_DT
+				, CHG_SEQ
+				, CHG_TP
+				, BF_VALUE
+				, AF_VALUE
+				, IN_USER
+				, IN_TIME
+			)
+			VALUES(
+				  P_COMP_CD
+				, CUR_CUST.CUS_NO_INNER
+				, TO_CHAR(SYSDATE, 'YYYYMMDD')
+				, NVL(
+						( SELECT 
+							  NVL(MAX(CHG_SEQ), 0)+1
+						  FROM 
+							  CSCUSTMSTHIST 
+						  WHERE COMP_CD      = P_COMP_CD
+							AND CUS_NO_INNER = CUR_CUST.CUS_NO_INNER
+							AND CHG_DT       = TO_CHAR(SYSDATE, 'YYYYMMDD')
+						 )
+					,1)
+				, '10'
+				, CUR_CUST.USEFUL_PNT
+				, '0'
+				, P_USER_CD
+				, SYSDATE
+			);
+			
+			V_ERR_POINT := 'CHECK_POINT_09';
+			--휴면처리 문자발송
+			SP_CUST_ACTI_SMS(P_COMP_CD, 'SYSTEM', P_USER_CD, CUR_CUST.CUS_NO_INNER, '2', O_ERR_CD, O_ERR_MSG);
+		END LOOP;
+	END;
+	COMMIT;
+EXCEPTION
+	WHEN OTHERS THEN
+		O_ERR_CD := '-1';
+		O_ERR_MSG := '[이상종료 - ' || 'SP_CUST_INAC' || ']' ||V_ERR_POINT|| ' - (' || TO_CHAR(SQLCODE) || ')' || SQLERRM;
+		ROLLBACK;	
+END SP_CUST_INAC;
