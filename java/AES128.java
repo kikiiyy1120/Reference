@@ -9,7 +9,7 @@ public class AES128 {
     private Key keySpec;
 	
 	public AES128() {
-		String key = "16byte 암호화키";
+		String key = "16byte encryption key";
         try {
             byte[] keyBytes = new byte[16];
             byte[] b = key.getBytes("UTF-8");
