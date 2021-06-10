@@ -9,13 +9,13 @@ public class AES128 {
     private Key keySpec;
 	
 	public AES128() {
-		String key = "0kaghzlrnlck_&ek";
+		String key = "16byte 암호화키";
         try {
             byte[] keyBytes = new byte[16];
             byte[] b = key.getBytes("UTF-8");
             System.arraycopy(b, 0, keyBytes, 0, keyBytes.length);
             SecretKeySpec keySpec = new SecretKeySpec(keyBytes, "AES");
-            this.ips = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"; //null 16bytes
+            this.ips = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"; //null 16bytes IV
             this.keySpec = keySpec;
         } catch (Exception e) {
             e.printStackTrace();
