@@ -16,7 +16,7 @@ public class AES128 {
     //생성자
 	public AES128() {
 		//암호화키를 암/복호화하는 암호화키 16byte
-		String key = "0kaghzlrnlck_&ek";
+		String key = "test1234test1234";
         try { 
         	//암호화키 저장할 byte[] 변수
             byte[] keyBytes = new byte[16];
