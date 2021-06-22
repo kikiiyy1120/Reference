@@ -4,18 +4,13 @@ import java.security.MessageDigest;
 
 public class SHA256 {
 	
-	public static void main(String[] args){
-		SHA256 qwe =new SHA256();
-		qwe.encrypt("test1234");
-	}
-	
     public String encrypt(String str){
     	try{
     		//해쉬함수 SHA-256 인스턴스 생성
     		MessageDigest md = MessageDigest.getInstance("SHA-256");
-    		//암호화
+    		//digest 계산
     		md.update(str.getBytes("UTF-8"));
-    		//16진수로 변환 후 리턴
+    		//암호화 후 16진수로 변환 후 리턴
     		return byteArrayToHex(md.digest()).toUpperCase();
     	}
     	catch(Exception e){
