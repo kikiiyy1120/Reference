@@ -6,11 +6,11 @@ public class SHA256 {
 	
     public String encrypt(String str){
     	try{
-    		//해쉬함수 SHA-256 인스턴스 생성
+    		//Create SHA-256 instance 
     		MessageDigest md = MessageDigest.getInstance("SHA-256");
-    		//digest 계산
+    		//Calculate digest
     		md.update(str.getBytes("UTF-8"));
-    		//암호화 후 16진수로 변환 후 리턴
+    		//Return hash value after converting hexa string
     		return byteArrayToHex(md.digest()).toUpperCase();
     	}
     	catch(Exception e){
@@ -27,7 +27,6 @@ public class SHA256 {
         
         StringBuffer sb = new StringBuffer();
         for (byte b : encrypted) {
-        	//앞 빈자리 0으로 채우는 16진수 (16진수는 2자리)
         	sb.append(String.format("%02x", b));
         }
         return sb.toString();
